@@ -7,10 +7,12 @@ import ply2xyz
 
 class IDF(object):
 
-	def __init__(self):
+	def __init__(self, sessionName):
 		self._done = False
 		self._stateList = ['handshake', 'initGeo']
 		self._state = self._stateList[0]
+		self._cycle = 0
+		self._session = sessionName
 		
 		# UDP
 		self.udp_out = UDP(mode = 'out')
@@ -38,7 +40,8 @@ class IDF(object):
 	def gh_py_handhake(self):
 		print("Handshaking...", end='')
 		self.UDP_send('+gh_handshake')
-		if self.UDP_receive(5) == '-gh_success':
+		ret = self.UDP_receive(5)
+		if ret == '-gh_success':
 			self._state = 'initGeo'
 			print("Successful!")
 		else:
@@ -49,16 +52,21 @@ class IDF(object):
 	def toolPathRequest(self, mode):
 		if mode == "init":
 			print("Requesting Initial Tool Path...", end='')
-			msg = '+gh_initGeo' + "_" + str(self.resolution)
+			filename = self._session + "-tp" + str(self._cycle)
+			msg = '+gh_initGeo' + "_" + str(self.resolution) + "_" + str(self.layer_height) + "_" + str(filename)
 			self.UDP_send(msg)
-			ret = self.UDP_receive(5)
+			ret = self.UDP_receive(20)
 			if ret == '-gh_success':
 				self._state = 'readyToPrint'
 				print("Successful!")
+			elif ret == '-gh_fail_noInitGeo':
+				print(" Failed!")
+				print("Initial Geometry Missing!")
+				self._done = True
 			else:
 				print(" Failed!")
 				self._done = True
-		if mode == "cv":
+		else:
 			pass
 
 	def runHorus(self):
@@ -79,5 +87,5 @@ class IDF(object):
 			###################################
 			# listener.join()
 
-a = IDF()
+a = IDF('test')
 a.run()

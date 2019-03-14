@@ -28,7 +28,7 @@ class UDP():
 			data, addr = self.socket.recvfrom(1024)
 			if data:
 				data = self.b2str(data)
-				print("received: ", data)
+				# print("received: ", data)
 				return data
 				break
 			elif runtime != None:
