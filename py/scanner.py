@@ -12,6 +12,7 @@ class Scanner():
 	def __init__(self, session):
 		self._name = "Horus 0.2rc1"
 		self._session = session
+		self.process = None
 		self.cycle = 0
 
 		self.workbench = None
@@ -48,7 +49,7 @@ class Scanner():
 		# win32api.SetCursorPos((x,y))
 		# win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
 		# win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)
-		time.sleep(.1)
+		time.sleep(.25)
 
 	def runHorus(self):
 		cmd = "C:/ProgramData/Microsoft/Windows/Start Menu/Programs/Horus/Horus.lnk"
@@ -137,7 +138,7 @@ class Scanner():
 		self.click(2825,25)
 
 	def ply2xyz(self, FN):
-		fileDir = "../sessions/" + self._session
+		fileDir = "C:/Users/Ozguc Capunaman/Documents/GitHub/InteractiveDigitalFabrication/sessions/" + self._session
 		srcDir = fileDir + "/" + FN + ".ply"
 		ply = open3d.read_triangle_mesh(srcDir)
 		xyz = open3d.PointCloud()
@@ -169,6 +170,7 @@ class Scanner():
 	def run(self, FN):
 		self.scan()
 		self.saveScan(FN)
+		time.sleep(1)
 		self.ply2xyz(FN)
 		self.enableMotors()
 
