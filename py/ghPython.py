@@ -14,6 +14,7 @@ class ghApp():
 		
 		self.resolution = None
 		self.layer_height = None
+		self.WObj = WObj
 
 	def initSlice(self, init_geo):
 		result = []
@@ -30,6 +31,12 @@ class ghApp():
 			else:
 				result.append(crv)
 		return result
+
+	def matchWObj(self, geoList):
+	    ref = rs.AddPoint(0,0,0)
+	    vec = rs.VectorCreate(self.WObj, ref)
+	    # Add Rotation
+	    return rs.CopyObjects(geoList, vec)
 	
 	def crv2pts(self, crvList):
 		result = []
@@ -63,18 +70,18 @@ class ghApp():
 		else:
 			raise Exception('File doesn\'t exist!')
 
-	def shift(seq, n):
+	def shift(self, seq, n):
 		for i in range(n):
 			seq.append(seq.pop(0))
 		return seq
 
-	def divideLR(ptList):
+	def divideLR(self, ptList):
 		Llist = rs.CopyObjects(ptList[0:][::2])
 		Rlist = rs.CopyObjects(ptList[1:][::2])
 		shift(Rlist, 4)
 		return Llist, Rlist
 
-	def mergeLR(Llist, Rlist):
+	def mergeLR(self, Llist, Rlist):
 		assert(len(Llist) == len(Rlist))
 		mergedList = []
 		for i in range(len(Llist)):
@@ -102,7 +109,7 @@ class ghApp():
 					tmp = []
 		return ptList
 
-	def createLines(ptList, rebuildCount = 10, degree = 3 ):
+	def createLines(self, ptList, rebuildCount = 10, degree = 3 ):
 		crvList = []
 		for i in range(len(ptList)):
 			crv = rs.AddInterpCurve(ptList[i])
@@ -110,7 +117,7 @@ class ghApp():
 			crvList.append(crv)
 		return crvList
 
-	def offsetCurves(crvList, offsetFactor=5):
+	def offsetCurves(self, crvList, offsetFactor=5):
 		result = []
 		for i in range(len(crvList)):
 			x,y,_ = rs.CurveEndPoint(crvList[i])
@@ -121,7 +128,7 @@ class ghApp():
 			result.append(tmp)
 		return result
 		
-	def getExtendedCrv(crvList, dist=50, layer_height=2.5, vecMul = .66):
+	def getExtendedCrv(self, crvList, dist=50, layer_height=2.5, vecMul = .66):
 		segmentCount = int(math.floor(dist / layer_height)) - 1
 		tmpList = []
 		for i in range(len(crvList)):
@@ -153,7 +160,7 @@ class ghApp():
 					result.append(rs.CopyObject(crv))
 		return result
 
-	def getExtendedTP(crvList, dist=50, layer_height=2.5):
+	def getExtendedTP(self, crvList, dist=50, layer_height=2.5):
 		result = []
 		ptsList = []
 		lenList = []
@@ -172,12 +179,14 @@ class ghApp():
 		result.reverse()
 		return result
 
-	def interpolateTP(ptCloud):
-		ptList = self.dividePtCloud(pts)
+	def interpolateTP(self, ptCloud):
+		ptList = self.dividePtCloud(ptCloud)
 		crvL, crvR = self.divideLR(createLines(ptList, 5))
 		crvMerged = self.mergeLR(crvL, crvR)
-		
-		offCrv = self.offsetCurves(crvMerged)
+
+		WObjCrv = matchWObj(crvMerged, x)
+
+		offCrv = self.offsetCurves(WObjCrv)
 		extCrv = self.getExtendedCrv(offCrv)
 		extTP = self.getExtendedTP(extCrv)
 		return extTP 
@@ -222,19 +231,12 @@ class ghApp():
 					elif argsList[1] == "readScan":
 					# (2)filename_(3)output
 						pc = self.xyz2pts(argsList[2])
-						pc = self.dividePtCloud(pc)
-						crvList = self.createLines(pc)
-
-						extCrv = self.getExtendedCurves(crvList)
-						extTp = self.getExtendedToolpath(extCrv)
-						extPts = self.crv2pts(extTp)
-
-						self.pts2xyz(extPts, argsList[3])
+						extTP = interpolateTP(pc)
+						self.pts2xyz(extTP, argsList[3])
 
 						time.sleep(.1)
 						print("Reading Point Cloud Done!")
 						return "-gh_success"
-						
 		return ""     
 
 key = "app"
@@ -242,7 +244,7 @@ key = "app"
 if sc.sticky.has_key(key):
 	app = sc.sticky[key]
 else:
-	app = None
+	sc.sticky[key] = ghApp()
 if RESET:
 	sc.sticky[key] = ghApp()
 

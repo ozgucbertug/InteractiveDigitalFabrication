@@ -1,10 +1,8 @@
 from pynput.keyboard import Key, KeyCode, Listener
-import threading
-import time
-import datetime
-import os
-import machinaRobot
+import threading, time, datetime, os
+import open3d
 
+from machinaRobot import *
 from udpComm import UDP
 from scanner import Scanner
 
@@ -28,6 +26,14 @@ class IDF(object):
 
 		self.listener = None
 
+		# Machina
+		# self.DO = ""
+		self.machinaRobot = MachinaRobot()
+		self.machinaRobot.speedTo(25)
+		# self.machinaRobot.MoveTo()
+
+		self.TP = None
+
 		self.create_session()
 		self.scanner = None
 
@@ -41,11 +47,13 @@ class IDF(object):
 		print(key)
 		if self._done:
 			return False
-		if key == KeyCode(char='1') or key == Key.end:
+		if key == Key.esc:
 			self._done = True
 			return False
-		elif key == KeyCode(char='p') and self._state == 'readyToPrint':
+		elif key == Key.end and self._state == 'readyToPrint' and self.TP != None:
 			self._state = 'printing'
+		elif key == Key.down and self._state == 'printing':
+			self._state = 'readyToPrint'
 
 	### HORUS ###
 	
@@ -94,6 +102,7 @@ class IDF(object):
 			msg = '+gh_initGeo' + "_" + str(filename)
 			self.UDP_send(msg)
 			ret = self.UDP_receive(20)
+			self.import_TP(filename)
 		# else:
 		# 	print("Requesting Tool Path for Cycle %d..." %self._cycle, end='')
 		# 	filename = self._session + "-tp" + str(self._cycle)
@@ -112,18 +121,37 @@ class IDF(object):
 		print("Requesting Point Cloud Read...", end='')
 		filename = self._session + "-scan" + str(self._cycle-1)
 		filename2 = self._session + "-tp" + str(self._cycle)
-		msg = '+gh_readScan' + "_" + str(filename) + "_" + filename2
+		msg = '+gh_readScan' + "_" + str(filename) + "_" + str(filename2)
 		self.UDP_send(msg)
 		ret = self.UDP_receive(20)
 		if ret == '-gh_success':
 			self._state = 'readyToPrint'
 			print("Successful!")
+			self.import_TP(filename2)
 		else:
 			print(" Failed!")
 			self._done = True
 
-	def import_toolpath(self):
-		pass
+	def import_TP(self, FN):
+		filepath = self._mainDIR+self._session+"\\"+FN+".xyz"
+		if(os.path.exists(filepath)):
+			result = []
+			with open(filepath) as fp:  
+			   line = fp.readline()
+			   while line:
+				   curLine = line.strip()
+				   coord = curLine.split(' ')
+				   for i in range(len(coord)):
+					   coord[i] = float(coord[i])
+				   result.append(coord)
+				   line = fp.readline()
+		self.TP =  result
+
+		#################### DEV #######################
+	def push_TP(self)
+		for i in range(len(self.TP)):
+			curTarget = self.TP.pop(0)
+			self.machinaRobot.MoveTo(curTarget[0], curTarget[1], curTarget[2])
 
 	def ready_to_print(self):
 		print("Ready to start printing.\nPress [P] to proceed.")
@@ -142,7 +170,6 @@ class IDF(object):
 		time.sleep(1)
 		self._cycle += 1
 		self.request_read()
-
 
 
 	def main(self):

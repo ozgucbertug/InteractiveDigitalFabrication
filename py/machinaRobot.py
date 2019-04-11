@@ -25,8 +25,8 @@ class MachinaRobot (object):
 
     async def sendToBridge(self,address= "", command=""):
         # generic fucntion to communicate with web
-        print (command)
-        print (type(command))
+        # print (command)
+        # print (type(command))
         if not isinstance(command, str) :
             raise ValueError("command must be an string object.")
             
@@ -36,16 +36,16 @@ class MachinaRobot (object):
         if address == "": 
             address = self.address
 
-        print("sending to bridge...")
+        # print("sending to bridge...")
 
         async with websockets.connect(address) as websocket:
             # it waits until the ws sends the message
             await websocket.send(command)
-            print("Message sent:{}".format(command))
+            # print("Message sent:{}".format(command))
             # then waits Bridge sends the feedback
-            feedback = await websocket.recv()
+            # feedback = await websocket.recv()
             # then it prints the feedback
-            print("Message Recieved:{}".format(feedback))
+            # print("Message Recieved:{}".format(feedback))
 
 
     def runCommands(self,cmds = ""):
@@ -261,22 +261,25 @@ class MachinaRobot (object):
         self.commands = "PopSettings();" 
         self.runCommands()
         return  
-
-    def toolCreate(self,name, x, y, z, x0, x1, x2, y0, y1, y2, weight, cogX, cogY, cogZ):
-        self.commands =   "Tool.create(\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{},);".format(name,
+###
+    def defineTool(self,name, x, y, z, VXx, VXy, Vxz, VYx, VYy, VYz, weight, cogX, cogY, cogZ):
+        self.commands =   "DefineTool(\"{}\",{},{},{},{},{},{},{},{},{},{},{},{},{});".format(name,
+                                                                                                x, y, z,
+                                                                                                VXx, VXy, Vxz,
+                                                                                                VYx, VYy, VYz,
                                                                                                 weight, 
                                                                                                 cogX, cogY, cogZ)
         self.runCommands()
         return
 
 
-    def attach(self,name):
-        self.commands = "Attach(\"{}\");".format(name) 
+    def attachTool(self,name):
+        self.commands = "AttachTool(\"{}\");".format(name) 
         self.runCommands()
         return  
 
-    def detach(self):
-        self.commands = "Detach();" 
+    def detachTool(self):
+        self.commands = "DetachTool();" 
         self.runCommands()
         return 
 
