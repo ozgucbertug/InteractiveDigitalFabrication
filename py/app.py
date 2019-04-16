@@ -2,7 +2,7 @@ from pynput.keyboard import Key, KeyCode, Listener
 import threading, time, datetime, os
 import open3d
 
-from machinaRobot import *
+from robot import Robot
 from udpComm import UDP
 from scanner import Scanner
 
@@ -23,19 +23,19 @@ class IDF(object):
 		self.nozzle_width = 10
 		self.layer_height = self.nozzle_width/4
 		self.resolution = 100
+		self.minLayer = 0
 
 		self.listener = None
 
 		# Machina
 		# self.DO = ""
-		self.machinaRobot = MachinaRobot()
-		self.machinaRobot.speedTo(25)
-		# self.machinaRobot.MoveTo()
+		self.robot = Robot(ptPerLayer=self.resolution, printSpeed=100)
 
 		self.TP = None
 
 		self.create_session()
 		self.scanner = None
+		threading.Thread(target=self.init_horus).start()
 
 	### KEYBOARD ###
 
@@ -44,17 +44,32 @@ class IDF(object):
 			self.listener.join()
 
 	def on_press(self, key):
-		print(key)
+		# print(key)
 		if self._done:
 			return False
 		if key == Key.esc:
 			self._done = True
 			return False
-		elif key == Key.end and self._state == 'readyToPrint' and self.TP != None:
-			self._state = 'printing'
-		elif key == Key.down and self._state == 'printing':
-			self._state = 'readyToPrint'
-
+		elif key == KeyCode(char='+'):
+			if self._state == "geoEdit":
+				self.UDP_send("+gh_inc")
+				self.request_read()
+		elif key == KeyCode(char='-'):
+			if self._state == "geoEdit":
+				self.UDP_send("+gh_dec")
+				self.request_read()
+		elif key == Key.end:
+			if self._state == 'ready' and len(self.TP) >= self.resolution:
+				self._state = 'printing'
+				print("Starting Fabrication...")
+			if self._state == "geoEdit":
+				self._state = 'printing'
+		elif key == Key.down and self._state == 'printing' and self.robot.layerCount>=self.minLayer:
+			self._state = 'ready'
+			self.robot.master = False
+			print("Stopping Fabrication")
+		elif key == Key.left and self._state == 'ready':
+			self._state = 'scanning'
 	### HORUS ###
 	
 	def init_horus(self):
@@ -95,73 +110,95 @@ class IDF(object):
 			print(" Failed!")
 			self._done = True
 
-	def request_toolpath(self, mode=None):
-		if mode == "init":
-			print("Requesting Initial Tool Path...", end='')
-			filename = self._session + "-tp" + str(self._cycle)
-			msg = '+gh_initGeo' + "_" + str(filename)
-			self.UDP_send(msg)
-			ret = self.UDP_receive(20)
-			self.import_TP(filename)
-		# else:
-		# 	print("Requesting Tool Path for Cycle %d..." %self._cycle, end='')
-		# 	filename = self._session + "-tp" + str(self._cycle)
-		# 	msg = '+gh_cycleGeo' + "_" + str(filename)
-		# 	self.UDP_send(msg)
-		# 	ret = self.UDP_receive(20)
+	def request_init_toolpath(self):
+		print("Requesting Initial Tool Path...", end='')
+		filename = self._session + "-tp" + str(self._cycle)
+		msg = '+gh_initGeo' + "_" + str(filename)
+		self.UDP_send(msg)
+		ret = self.UDP_receive(20)
+		self.import_TP(filename)
 
 		if ret == '-gh_success':
-			self._state = 'readyToPrint'
+			self._state = 'ready'
 			print("Successful!")
 		else:
 			print(" Failed!")
-			self._done = True
+			# self._done = True
 	
 	def request_read(self):
 		print("Requesting Point Cloud Read...", end='')
 		filename = self._session + "-scan" + str(self._cycle-1)
-		filename2 = self._session + "-tp" + str(self._cycle)
-		msg = '+gh_readScan' + "_" + str(filename) + "_" + str(filename2)
+		msg = '+gh_extGeo' + "_" + str(filename)
 		self.UDP_send(msg)
 		ret = self.UDP_receive(20)
 		if ret == '-gh_success':
-			self._state = 'readyToPrint'
+			print("Successful!")
+		else:
+			print(" Failed!")
+			# self._done = True
+
+	def request_ext_toolpath(self):
+		print("Requesting Point Cloud Read...", end='')
+		filename = self._session + "-scan" + str(self._cycle-1)
+		filename2 = self._session + "-tp" + str(self._cycle)
+		msg = '+gh_extTP' + "_" + str(filename) + str(filename2)
+		self.UDP_send(msg)
+		ret = self.UDP_receive(20)
+		if ret == '-gh_success':
+			self._state = 'ready'
 			print("Successful!")
 			self.import_TP(filename2)
 		else:
 			print(" Failed!")
-			self._done = True
+			# self._done = True
 
 	def import_TP(self, FN):
 		filepath = self._mainDIR+self._session+"\\"+FN+".xyz"
 		if(os.path.exists(filepath)):
 			result = []
 			with open(filepath) as fp:  
-			   line = fp.readline()
-			   while line:
-				   curLine = line.strip()
-				   coord = curLine.split(' ')
-				   for i in range(len(coord)):
-					   coord[i] = float(coord[i])
-				   result.append(coord)
-				   line = fp.readline()
-		self.TP =  result
+				line = fp.readline()
+				while line:
+					curLine = line.strip()
+					coord = curLine.split()
+					if len(coord) == 3:
+						for i in range(len(coord)):
+							if coord[i] == "0.0":
+								coord[i] = 0.0
+							else:
+								coord[i] = float(coord[i])
+						result.append(coord)
+					line = fp.readline()
+			self.TP = P = self.add(result)
 
-		#################### DEV #######################
-	def push_TP(self)
-		for i in range(len(self.TP)):
-			curTarget = self.TP.pop(0)
-			self.machinaRobot.MoveTo(curTarget[0], curTarget[1], curTarget[2])
-
-	def ready_to_print(self):
-		print("Ready to start printing.\nPress [P] to proceed.")
-		while not self._done:
-			time.sleep(.1)
-			if self._state == 'printing':
-				break
+	def ready(self):
+		if self._cycle == 0 and self.robot.layerCount == 0:
+			print("Ready to start printing.\nPress [START PRINT] to proceed.")
+			while not self._done:
+				time.sleep(.1)
+				if self._state == 'printing':
+					break
+		elif len(self.TP) >= self.resolution:
+			print("Ready to scan or print.\nPress [START PRINT] to continue fabrication or [START SCANNING] to scan.")
+			while not self._done:
+				time.sleep(.1)
+				if self._state == 'printing' or self._state == 'scanning':
+					break
+		else:
+			print("Ready to start scanning.\nPress [START SCANNING] to proceed.")
+			while not self._done:
+				time.sleep(.1)
+				if self._state == 'scanning':
+					break
 
 	def printing(self):
-		self._state = 'scanning'
+		if self._cycle > 0:
+			self.request_ext_toolpath()
+		assert(self.TP != None)
+		self.robot.initTP(self.TP)
+		self.robot.runTP()
+		self._state = 'ready'
+
 
 	def scan(self):
 		if self.scanner == None:
@@ -170,6 +207,14 @@ class IDF(object):
 		time.sleep(1)
 		self._cycle += 1
 		self.request_read()
+		self._state = "geoEdit"
+
+	def add(self,coord):
+		for c in coord:
+			c[0] = c[0] + 2000
+			c[1] = c[1] + 100
+			c[2] = c[2] + 750
+		return coord
 
 
 	def main(self):
@@ -180,10 +225,10 @@ class IDF(object):
 				self.gh_py_handhake()
 				time.sleep(.25)
 			if self._state == 'initGeo':
-				self.request_toolpath("init")
+				self.request_init_toolpath()
 				time.sleep(.25)
-			if self._state == 'readyToPrint':
-				self.ready_to_print()
+			if self._state == 'ready':
+				self.ready()
 				time.sleep(.25)
 			if self._state == 'printing':
 				self.printing()
@@ -191,11 +236,14 @@ class IDF(object):
 			if self._state == 'scanning':
 				self.scan()
 				time.sleep(.25)
+			if self._state == 'geoEdit':
+				# self.geoEdit()
+				time.sleep(.25)
 			###################################
 		self.listener.stop()
 	def run(self):
-		threading.Thread(target=self.keyboard_listener).start()
 		threading.Thread(target=self.main).start()
+		threading.Thread(target=self.keyboard_listener).start()
 		
 
 a = IDF()

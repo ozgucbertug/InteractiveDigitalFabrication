@@ -12,7 +12,7 @@ class MachinaMonitor(object):
 		
 		self.targetPos = None
 
-	async def listen(self):
+	async def listen(self, q):
 		isRunning = True
 		async with websockets.connect(self.address) as websocket:
 			while isRunning:
@@ -28,7 +28,8 @@ class MachinaMonitor(object):
 						pos.append(float(tmp))
 					# print("curPos: ", pos, "/targetPos: ", self.targetPos, "/dist: ", self.eucDist(pos))
 					if self.isLayerComplete(pos):
-						return True
+						q.put(1)
+						return# True
 
 	def eucDist(self, pt):
 		sqSum = 0
@@ -44,12 +45,12 @@ class MachinaMonitor(object):
 			return True
 
 
-	def monitorLayer(self, target):
+	def monitorLayer(self, target, q):
 		assert(target != None)
 		self.layerCount = 0
 		self.isMonitoring = True
 		self.targetPos = target
-		return self.monitor()
+		return self.monitor(q)
 
-	def monitor(self):
-		return asyncio.get_event_loop().run_until_complete(self.listen())
+	def monitor(self, q):
+		return asyncio.new_event_loop().run_until_complete(self.listen(q))

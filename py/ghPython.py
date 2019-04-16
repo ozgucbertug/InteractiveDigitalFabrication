@@ -6,6 +6,11 @@ import math
 import time
 import os
 import scriptcontext as sc
+import clr
+from Grasshopper.Kernel.Data import GH_Path
+from Grasshopper import DataTree
+
+clr.AddReference("Grasshopper")
 
 class ghApp():
 	def __init__(self):
@@ -15,6 +20,21 @@ class ghApp():
 		self.resolution = None
 		self.layer_height = None
 		self.WObj = WObj
+
+		self.userParam = .6
+		self.srf = DataTree[object]()
+
+	def changeUserParam(self,msg,deltaVal =.1):
+		if msg == "inc":
+			if self.userParam + deltaVal >= 1.:
+				self.userParam = 1.
+			else:
+				self.userParam += deltaVal
+		else:
+			if self.userParam - deltaVal <= 0:
+				self.userParam = 0
+			else:
+				self.userParam -= deltaVal
 
 	def initSlice(self, init_geo):
 		result = []
@@ -32,11 +52,11 @@ class ghApp():
 				result.append(crv)
 		return result
 
-	def matchWObj(self, geoList):
-	    ref = rs.AddPoint(0,0,0)
-	    vec = rs.VectorCreate(self.WObj, ref)
-	    # Add Rotation
-	    return rs.CopyObjects(geoList, vec)
+	def matchWObj(self, geoList, target):
+		ref = rs.AddPoint(0,0,0)
+		vec = rs.VectorCreate(target, ref)
+		rot = rs.RotateObjects(geoList, rs.AddPoint(0,0,0), -90, copy=True)
+		return rs.CopyObjects(rot, vec)
 	
 	def crv2pts(self, crvList):
 		result = []
@@ -78,7 +98,7 @@ class ghApp():
 	def divideLR(self, ptList):
 		Llist = rs.CopyObjects(ptList[0:][::2])
 		Rlist = rs.CopyObjects(ptList[1:][::2])
-		shift(Rlist, 4)
+		self.shift(Rlist, 2)
 		return Llist, Rlist
 
 	def mergeLR(self, Llist, Rlist):
@@ -131,8 +151,10 @@ class ghApp():
 	def getExtendedCrv(self, crvList, dist=50, layer_height=2.5, vecMul = .66):
 		segmentCount = int(math.floor(dist / layer_height)) - 1
 		tmpList = []
+		fullHeight = []
 		for i in range(len(crvList)):
 			extendedCrv = rs.ExtendCurveLength(crvList[i], 2, 0, dist)
+			fullHeight.append(extendedCrv)
 			domStart, domEnd = rs.CurveDomain(extendedCrv)
 			trimmedCrv = rs.TrimCurve(extendedCrv, (domStart, 0))
 			tmpList.append(trimmedCrv)
@@ -179,19 +201,33 @@ class ghApp():
 		result.reverse()
 		return result
 
-	def interpolateTP(self, ptCloud):
+
+	def extrapolateTP(self, ptCloud):
 		ptList = self.dividePtCloud(ptCloud)
-		crvL, crvR = self.divideLR(createLines(ptList, 5))
+		crvL, crvR = self.divideLR(self.createLines(ptList, 5))
 		crvMerged = self.mergeLR(crvL, crvR)
-
-		WObjCrv = matchWObj(crvMerged, x)
-
-		offCrv = self.offsetCurves(WObjCrv)
-		extCrv = self.getExtendedCrv(offCrv)
+		offCrv = self.offsetCurves(crvMerged)
+		WObjCrv = self.matchWObj(offCrv, WObj)
+		extCrv = self.getExtendedCrv(WObjCrv, vecMul = self.userParam)
 		extTP = self.getExtendedTP(extCrv)
-		return extTP 
+		return extTP
+
+	def extrapolateGeo(self, ptCloud):
+		ptList = self.dividePtCloud(ptCloud)
+		crvL, crvR = self.divideLR(self.createLines(ptList, 5))
+		crvMerged = self.mergeLR(crvL, crvR)
+		offCrv = self.offsetCurves(crvMerged)
+		print(self.userParam)
+		extCrv = self.getExtendedCrv(offCrv, vecMul = self.userParam)
+		self.srf = []
+		recSrf = self.reconSrf(offCrv)
+		extSrf = self.reconSrf(extCrv)
+		self.srf.extend(recSrf)
+		self.srf.extend(extSrf)
+		return extCrv
 		
 	def reconSrf(self, crvList):
+		assert(crvList != None)
 		return rs.AddLoftSrf(crvList, closed = True)
 	
 	def decodeMessage(self, udp_in):
@@ -228,15 +264,22 @@ class ghApp():
 						return "-gh_success"
 					
 					### READ SCAN ###
-					elif argsList[1] == "readScan":
+					elif argsList[1] == "extGeo":
+					# (2)filename
+						pc = self.xyz2pts(argsList[2])
+						self.extrapolateGeo(pc)
+						time.sleep(.1)
+						print("Extrapolated Geometry!")
+						return "-gh_success"
+					elif argsList[1] == "extTP":
 					# (2)filename_(3)output
 						pc = self.xyz2pts(argsList[2])
-						extTP = interpolateTP(pc)
+						extTP = self.extrapolateTP(pc)
 						self.pts2xyz(extTP, argsList[3])
-
 						time.sleep(.1)
-						print("Reading Point Cloud Done!")
+						print("Extrapolated Toolpath!")
 						return "-gh_success"
+
 		return ""     
 
 key = "app"
@@ -250,3 +293,4 @@ if RESET:
 
 if app != None:
 	udp_out = app.run(RUN, udp_in)
+	srf = app.srf

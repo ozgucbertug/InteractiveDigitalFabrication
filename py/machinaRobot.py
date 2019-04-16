@@ -12,7 +12,7 @@ class MachinaRobot (object):
     def __init__(self, address = "ws://127.0.0.1:6999/Bridge", debug = False):
         # init 
         self.command = ""
-        self.command = []
+        self.commands = []
         self.address = address
         self.debug = debug
 
@@ -60,8 +60,8 @@ class MachinaRobot (object):
 
         if address == "": 
             address = self.address
-        if command =="":
-            command = self.commands
+        if commands == "":
+            commands = self.commands
 
         # print(commands)
         # print("sending to bridge...")
@@ -110,7 +110,7 @@ class MachinaRobot (object):
                 raise ValueError("command {}".format(self.listError))
 
         # try:
-        asyncio.get_event_loop().run_until_complete(self.sendQueueToBridge())
+        asyncio.new_event_loop().run_until_complete(self.sendQueueToBridge())
         # except:
             # print ("FAILED TO RUN STACKED COMMANDS")
         # return

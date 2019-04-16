@@ -46,9 +46,6 @@ class Scanner():
 	def click(self, x, y):
 		pyautogui.moveTo(x, y)
 		pyautogui.click()
-		# win32api.SetCursorPos((x,y))
-		# win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,x,y,0,0)
-		# win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,x,y,0,0)
 		time.sleep(.25)
 
 	def runHorus(self):
@@ -121,8 +118,8 @@ class Scanner():
 
 	def scan(self):
 		print("Initiating Scan...", end="")
-		if self.workbench != "scanning":
-			self.goToScanningWorkbench()
+		print(self.workbench)
+		self.goToScanningWorkbench()
 		self.click(158,125) #start scan
 		time.sleep(1)
 		if self.clearPtCloud():
@@ -174,6 +171,7 @@ class Scanner():
 		self.ply2xyz(FN)
 		self.enableMotors()
 
-
+# a = Scanner("test")
+# a.scan()
 # coord = pyautogui.position()
 # print(coord)
