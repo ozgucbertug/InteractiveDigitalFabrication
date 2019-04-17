@@ -38,7 +38,7 @@ class MachinaMonitor(object):
 		return math.sqrt(sqSum)
 
 	def isLayerComplete(self, curPos):
-		if self.eucDist(curPos) > .1:
+		if self.eucDist(curPos) > .5:
 			return False
 		else:
 			self.layerCount += 1

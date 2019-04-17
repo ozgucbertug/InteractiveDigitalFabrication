@@ -22,7 +22,7 @@ class Robot(object):
 	def robotSetup(self):
 		self.robot.queueSpeedTo(25)
 		self.robot.queueAccelerationTo(100)
-		self.robot.queuePrecisionTo(.1)
+		self.robot.queuePrecisionTo(.5)
 		self.robot.queueMotionMode("joint")
 		self.robot.queueDefineTool("clayExtruder",-380.474,-211.024,219.652,0,0,1,0,1,0,1,1,1,1)
 		self.robot.queueAttachTool("clayExtruder")
@@ -56,7 +56,6 @@ class Robot(object):
 		# Push targets layer by layer.
 		while self.isRunning and self.master:
 			print("Layer: ", self.layerCount)
-			print(self.isRunning, self.master)
 			if len(self.TP) < 100:
 				break
 			layerTarget = self.TP[:self.ptPerLayer][-1]

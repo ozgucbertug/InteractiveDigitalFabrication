@@ -19,22 +19,31 @@ class ghApp():
 		
 		self.resolution = None
 		self.layer_height = None
-		self.WObj = WObj
+		self.WObj = rs.PointCoordinates(WObj)
 
 		self.userParam = .6
-		self.srf = DataTree[object]()
+		sc.sticky["param"] = self.userParam
+		sc.sticky["FN"] = None
+		sc.sticky["DIR"] = self._mainDIR
 
-	def changeUserParam(self,msg,deltaVal =.1):
+
+
+	def changeUserParam(self,msg,deltaVal =.05):
 		if msg == "inc":
 			if self.userParam + deltaVal >= 1.:
 				self.userParam = 1.
+				sc.sticky["param"] = self.userParam
+
 			else:
 				self.userParam += deltaVal
+				sc.sticky["param"] = self.userParam
 		else:
 			if self.userParam - deltaVal <= 0:
 				self.userParam = 0
+				sc.sticky["param"] = self.userParam
 			else:
 				self.userParam -= deltaVal
+				sc.sticky["param"] = self.userParam
 
 	def initSlice(self, init_geo):
 		result = []
@@ -52,9 +61,9 @@ class ghApp():
 				result.append(crv)
 		return result
 
-	def matchWObj(self, geoList, target):
+	def matchWObj(self, geoList):
 		ref = rs.AddPoint(0,0,0)
-		vec = rs.VectorCreate(target, ref)
+		vec = rs.VectorCreate(rs.AddPoint(self.WObj), ref)
 		rot = rs.RotateObjects(geoList, rs.AddPoint(0,0,0), -90, copy=True)
 		return rs.CopyObjects(rot, vec)
 	
@@ -207,9 +216,10 @@ class ghApp():
 		crvL, crvR = self.divideLR(self.createLines(ptList, 5))
 		crvMerged = self.mergeLR(crvL, crvR)
 		offCrv = self.offsetCurves(crvMerged)
-		WObjCrv = self.matchWObj(offCrv, WObj)
+		WObjCrv = self.matchWObj(offCrv)
 		extCrv = self.getExtendedCrv(WObjCrv, vecMul = self.userParam)
-		extTP = self.getExtendedTP(extCrv)
+		extLayer = self.getExtendedTP(extCrv)
+		extTP = self.crv2pts(extLayer)
 		return extTP
 
 	def extrapolateGeo(self, ptCloud):
@@ -217,13 +227,7 @@ class ghApp():
 		crvL, crvR = self.divideLR(self.createLines(ptList, 5))
 		crvMerged = self.mergeLR(crvL, crvR)
 		offCrv = self.offsetCurves(crvMerged)
-		print(self.userParam)
 		extCrv = self.getExtendedCrv(offCrv, vecMul = self.userParam)
-		self.srf = []
-		recSrf = self.reconSrf(offCrv)
-		extSrf = self.reconSrf(extCrv)
-		self.srf.extend(recSrf)
-		self.srf.extend(extSrf)
 		return extCrv
 		
 	def reconSrf(self, crvList):
@@ -243,6 +247,7 @@ class ghApp():
 					if argsList[1] == "handshake":
 					# (2)session_(3)resolution_(4)layerheight
 						self._session = argsList[2]
+						sc.sticky["session"] = self._session
 						self.resolution = int(argsList[3])
 						self.layer_height = float(argsList[4])
 						time.sleep(.1)
@@ -257,7 +262,8 @@ class ghApp():
 							return "-gh_fail_noInitGeo"
 						else:
 							crvList = self.initSlice(init_geo)
-							pts = self.crv2pts(crvList)
+							WObjCrv = self.matchWObj(crvList)
+							pts = self.crv2pts(WObjCrv)
 							self.pts2xyz(pts, argsList[2])
 						time.sleep(.1)
 						print("Returning Initial Toolpath Done!")
@@ -266,19 +272,23 @@ class ghApp():
 					### READ SCAN ###
 					elif argsList[1] == "extGeo":
 					# (2)filename
-						pc = self.xyz2pts(argsList[2])
-						self.extrapolateGeo(pc)
+						# pc = self.xyz2pts(argsList[2])
+						# self.extrapolateGeo(pc)
 						time.sleep(.1)
-						print("Extrapolated Geometry!")
+						sc.sticky["FN"] = argsList[2]
+						# print("Extrapolated Geometry!")
 						return "-gh_success"
 					elif argsList[1] == "extTP":
 					# (2)filename_(3)output
+						print("-")
 						pc = self.xyz2pts(argsList[2])
 						extTP = self.extrapolateTP(pc)
 						self.pts2xyz(extTP, argsList[3])
 						time.sleep(.1)
-						print("Extrapolated Toolpath!")
+						print("Returning Extrapolated Toolpath Done!")
 						return "-gh_success"
+					elif argsList[1] == "dec" or argsList[1] == "inc":
+						self.changeUserParam(argsList[1])
 
 		return ""     
 
@@ -293,4 +303,6 @@ if RESET:
 
 if app != None:
 	udp_out = app.run(RUN, udp_in)
-	srf = app.srf
+
+
+	

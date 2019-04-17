@@ -44,7 +44,6 @@ class IDF(object):
 			self.listener.join()
 
 	def on_press(self, key):
-		# print(key)
 		if self._done:
 			return False
 		if key == Key.esc:
@@ -53,23 +52,23 @@ class IDF(object):
 		elif key == KeyCode(char='+'):
 			if self._state == "geoEdit":
 				self.UDP_send("+gh_inc")
-				self.request_read()
 		elif key == KeyCode(char='-'):
 			if self._state == "geoEdit":
 				self.UDP_send("+gh_dec")
-				self.request_read()
-		elif key == Key.end:
+		elif key == KeyCode(char='1'):
 			if self._state == 'ready' and len(self.TP) >= self.resolution:
 				self._state = 'printing'
 				print("Starting Fabrication...")
 			if self._state == "geoEdit":
 				self._state = 'printing'
-		elif key == Key.down and self._state == 'printing' and self.robot.layerCount>=self.minLayer:
+		elif key == KeyCode(char='2') and self._state == 'printing' and self.robot.layerCount>=self.minLayer:
 			self._state = 'ready'
 			self.robot.master = False
 			print("Stopping Fabrication")
-		elif key == Key.left and self._state == 'ready':
+		elif key == KeyCode(char='4') and self._state == 'ready':
 			self._state = 'scanning'
+		elif key == KeyCode(char='5') and self._state == 'geoEdit':
+			self.request_ext_toolpath()
 	### HORUS ###
 	
 	def init_horus(self):
@@ -138,16 +137,17 @@ class IDF(object):
 			# self._done = True
 
 	def request_ext_toolpath(self):
-		print("Requesting Point Cloud Read...", end='')
+		print("Requesting Extrapolated Toolpath...", end='')
 		filename = self._session + "-scan" + str(self._cycle-1)
 		filename2 = self._session + "-tp" + str(self._cycle)
-		msg = '+gh_extTP' + "_" + str(filename) + str(filename2)
+		msg = '+gh_extTP' + "_" + str(filename) + "_" + str(filename2)
 		self.UDP_send(msg)
-		ret = self.UDP_receive(20)
+		ret = self.UDP_receive(5)
 		if ret == '-gh_success':
-			self._state = 'ready'
 			print("Successful!")
 			self.import_TP(filename2)
+			if self.TP != None:
+				self._state = 'ready'
 		else:
 			print(" Failed!")
 			# self._done = True
@@ -169,7 +169,7 @@ class IDF(object):
 								coord[i] = float(coord[i])
 						result.append(coord)
 					line = fp.readline()
-			self.TP = P = self.add(result)
+			self.TP = result
 
 	def ready(self):
 		if self._cycle == 0 and self.robot.layerCount == 0:
@@ -192,8 +192,6 @@ class IDF(object):
 					break
 
 	def printing(self):
-		if self._cycle > 0:
-			self.request_ext_toolpath()
 		assert(self.TP != None)
 		self.robot.initTP(self.TP)
 		self.robot.runTP()
@@ -208,6 +206,7 @@ class IDF(object):
 		self._cycle += 1
 		self.request_read()
 		self._state = "geoEdit"
+		self.TP = None
 
 	def add(self,coord):
 		for c in coord:

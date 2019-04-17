@@ -118,7 +118,6 @@ class Scanner():
 
 	def scan(self):
 		print("Initiating Scan...", end="")
-		print(self.workbench)
 		self.goToScanningWorkbench()
 		self.click(158,125) #start scan
 		time.sleep(1)
