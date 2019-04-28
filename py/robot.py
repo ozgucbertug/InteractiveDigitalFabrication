@@ -14,15 +14,18 @@ class Robot(object):
 		self.printSpeed = printSpeed
 		self.travelSpeed = travelSpeed
 		self.ptPerLayer = ptPerLayer
+		self.DO = "D651_11_DO6"
 
 		self.TP = TP
 		self.layerCount = 0
 		self.robotSetup()
 
 	def robotSetup(self):
+		self.robot.queueWriteDigital(self.DO, False)
+		self.robot.queueWriteDigital("DO_110vToolPower", True)
 		self.robot.queueSpeedTo(25)
 		self.robot.queueAccelerationTo(100)
-		self.robot.queuePrecisionTo(.5)
+		self.robot.queuePrecisionTo(.1)
 		self.robot.queueMotionMode("joint")
 		self.robot.queueDefineTool("clayExtruder",-380.474,-211.024,219.652,0,0,1,0,1,0,1,1,1,1)
 		self.robot.queueAttachTool("clayExtruder")
@@ -43,11 +46,13 @@ class Robot(object):
 		hoverPt[2] += 200
 		
 		# House Keeping Start
+		self.robot.queueDefineTool("clayExtruder",-380.474,-211.024,219.652,0,0,1,0,1,0,1,1,1,1)
+		self.robot.queueAttachTool("clayExtruder")
 		self.robot.queueSpeedTo(self.travelSpeed)
 		self.robot.queueMoveTo(hoverPt[0], hoverPt[1], hoverPt[2])
 		self.robot.queueMoveTo(self.TP[0][0],self.TP[0][1],self.TP[0][2])
 		self.robot.queueSpeedTo(self.printSpeed)
-
+		self.robot.queueWriteDigital(self.DO, True)
 		self.robot.runQueuedCommands()
 		time.sleep(1)
 
@@ -55,6 +60,8 @@ class Robot(object):
 
 		# Push targets layer by layer.
 		while self.isRunning and self.master:
+			self.robot.queueDefineTool("clayExtruder",-380.474,-211.024,219.652,0,0,1,0,1,0,1,1,1,1)
+			self.robot.queueAttachTool("clayExtruder")
 			print("Layer: ", self.layerCount)
 			if len(self.TP) < 100:
 				break
@@ -65,17 +72,17 @@ class Robot(object):
 
 			threading.Thread(target=self.robot.runQueuedCommands()).start()
 			threading.Thread(target=self.monitor.monitorLayer(layerTarget, returnQueue)).start()
-			while returnQueue.empty():
-				print(returnQueue.qsize())
-				time.sleep(.1)
+			# while returnQueue.empty():
+			# 	# print(returnQueue.qsize())
+			# 	time.sleep(.1)
 			self.isRunning = returnQueue.get()
 			self.layerCount += 1
-		#################################### add DO OFF
 
 		#House Keeping End
+		self.robot.queueWriteDigital(self.DO, False)
 		self.robot.queueSpeedTo(self.travelSpeed)
 		self.robot.queueMove(0,0,200)
-		# self.robot.queueMove(-500,0,0)
+		self.robot.queueMove(-200,0,0)
 		self.robot.queueSpeedTo(self.printSpeed)
 		self.robot.runQueuedCommands()
 

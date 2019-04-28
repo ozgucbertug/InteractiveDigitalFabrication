@@ -14,7 +14,6 @@ class IDF(object):
 		self._cycle = 0
 		self._session = None
 		self._mainDIR = "C:\\Users\\Ozguc Capunaman\\Documents\\GitHub\\InteractiveDigitalFabrication\\sessions\\"
-		
 		# UDP
 		self.udp_out = UDP(mode = 'out')
 		self.udp_in = UDP(PORT=5004, mode = 'in')
@@ -23,19 +22,18 @@ class IDF(object):
 		self.nozzle_width = 10
 		self.layer_height = self.nozzle_width/4
 		self.resolution = 100
-		self.minLayer = 0
+		self.minLayer = 30
 
 		self.listener = None
 
 		# Machina
-		# self.DO = ""
-		self.robot = Robot(ptPerLayer=self.resolution, printSpeed=100)
+		self.robot = Robot(ptPerLayer=self.resolution, printSpeed=25)
 
 		self.TP = None
 
 		self.create_session()
 		self.scanner = None
-		threading.Thread(target=self.init_horus).start()
+		self.init_horus()
 
 	### KEYBOARD ###
 
@@ -56,7 +54,7 @@ class IDF(object):
 			if self._state == "geoEdit":
 				self.UDP_send("+gh_dec")
 		elif key == KeyCode(char='1'):
-			if self._state == 'ready' and len(self.TP) >= self.resolution:
+			if self._state == 'ready' and self.TP != None and len(self.TP) >= self.resolution:
 				self._state = 'printing'
 				print("Starting Fabrication...")
 			if self._state == "geoEdit":
@@ -65,10 +63,17 @@ class IDF(object):
 			self._state = 'ready'
 			self.robot.master = False
 			print("Stopping Fabrication")
-		elif key == KeyCode(char='4') and self._state == 'ready':
+		elif key == KeyCode(char='4') and (self._state == 'ready' or self._state == "geoEdit"):
 			self._state = 'scanning'
 		elif key == KeyCode(char='5') and self._state == 'geoEdit':
 			self.request_ext_toolpath()
+		elif key == KeyCode(char='5') and self._state == 'ready' and self.TP == None and self._cycle == 0:
+			self.request_init_toolpath()
+			self._state = 'ready'
+		# elif key == KeyCode(char='0') and self._state == 'ready' and self.TP == None and self._cycle == 0:
+		# 	self.setWObj()
+			self._state = 'ready'
+
 	### HORUS ###
 	
 	def init_horus(self):
@@ -76,7 +81,6 @@ class IDF(object):
 
 	def run_horus(self):
 		self.scanner.run(self._session + "-scan" + str(self._cycle))
-
 
 	### UDP ###
 
@@ -103,10 +107,27 @@ class IDF(object):
 		self.UDP_send('+gh_handshake' + "_" + self._session + "_" + str(self.resolution) + "_" + str(self.layer_height))
 		ret = self.UDP_receive(5)
 		if ret == '-gh_success':
-			self._state = 'initGeo'
+			self._state = 'ready'
 			print("Successful!")
 		else:
 			print(" Failed!")
+			self._done = True
+
+	def setWObj(self):
+		print("Setting WObj...", end='')
+		WObj = self.robot.monitor.getPos()
+		print(WObj)
+		if WObj == None:
+			print("Failed! Not Connected to Machina-Bridge")
+			return
+		message = "+gh_WObj_" + WObj[0] + "_" + WObj[1] + "_" + WObj[2]
+		self.UDP_send(message)
+		ret = self.UDP_receive(5)
+		if ret == '-gh_success':
+			self._state = 'ready'
+			print("Successful!")
+		else:
+			print("Failed!")
 			self._done = True
 
 	def request_init_toolpath(self):
@@ -172,24 +193,35 @@ class IDF(object):
 			self.TP = result
 
 	def ready(self):
-		if self._cycle == 0 and self.robot.layerCount == 0:
+		if self._cycle == 0 and self.TP == None:
+			print("Press [CONFIRM GEO.] to import initial geometry toolpath or [START SCAN] to scan.")
+			while not self._done:
+				time.sleep(.1)
+				if self._state == 'scanning' or self.TP != None:
+					break
+		elif self._cycle == 0 and self.robot.layerCount == 0:
 			print("Ready to start printing.\nPress [START PRINT] to proceed.")
 			while not self._done:
 				time.sleep(.1)
 				if self._state == 'printing':
 					break
 		elif len(self.TP) >= self.resolution:
-			print("Ready to scan or print.\nPress [START PRINT] to continue fabrication or [START SCANNING] to scan.")
+			print("Ready to scan or print.\nPress [START PRINT] to continue fabrication or [START SCAN] to scan.")
 			while not self._done:
 				time.sleep(.1)
 				if self._state == 'printing' or self._state == 'scanning':
 					break
 		else:
-			print("Ready to start scanning.\nPress [START SCANNING] to proceed.")
+			print("Ready to start scanning.\nPress [START SCAN] to proceed.")
 			while not self._done:
 				time.sleep(.1)
 				if self._state == 'scanning':
 					break
+
+	def geoEdit(self):
+		print("Ready for Geometry Manipulation.\nPress [+] to straighten or [-] to bend the extrapolation. Press [START SCAN] to scan.")
+		while self._state == "geoEdit":
+			time.sleep(.25)
 
 	def printing(self):
 		assert(self.TP != None)
@@ -208,12 +240,12 @@ class IDF(object):
 		self._state = "geoEdit"
 		self.TP = None
 
-	def add(self,coord):
-		for c in coord:
-			c[0] = c[0] + 2000
-			c[1] = c[1] + 100
-			c[2] = c[2] + 750
-		return coord
+	# def add(self,coord):
+	# 	for c in coord:
+	# 		c[0] = c[0] + 2000
+	# 		c[1] = c[1] + 100
+	# 		c[2] = c[2] + 750
+	# 	return coord
 
 
 	def main(self):
@@ -236,14 +268,14 @@ class IDF(object):
 				self.scan()
 				time.sleep(.25)
 			if self._state == 'geoEdit':
-				# self.geoEdit()
+				self.geoEdit()
 				time.sleep(.25)
 			###################################
 		self.listener.stop()
 	def run(self):
 		threading.Thread(target=self.main).start()
 		threading.Thread(target=self.keyboard_listener).start()
-		
+
 
 a = IDF()
 a.run()

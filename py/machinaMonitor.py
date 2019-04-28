@@ -9,8 +9,25 @@ class MachinaMonitor(object):
 		self.address = address
 		self.isMonitoring = False
 		self.layerCount = 0
+		# self.curPos = None
 		
 		self.targetPos = None
+
+	async def getPos(self):
+		async with websockets.connect(self.address) as websocket:
+			feedback = await websocket.recv()
+			ind0 = feedback.find("\"pos\"")
+			if ind0 == -1:
+				self.curPos = None
+				return None
+			else:
+				ind1 = feedback.find("\"ori\"")
+				posStr = feedback[ind0+7:ind1-2]
+				pos = []
+				for tmp in posStr.split(","):
+					pos.append(float(tmp))
+				print(pos)	
+				return pos
 
 	async def listen(self, q):
 		isRunning = True
@@ -19,6 +36,7 @@ class MachinaMonitor(object):
 				feedback = await websocket.recv()
 				ind0 = feedback.find("\"pos\"")
 				if ind0 == -1:
+					self.curPos = None
 					pass#return None
 				else:
 					ind1 = feedback.find("\"ori\"")
@@ -27,6 +45,7 @@ class MachinaMonitor(object):
 					for tmp in posStr.split(","):
 						pos.append(float(tmp))
 					# print("curPos: ", pos, "/targetPos: ", self.targetPos, "/dist: ", self.eucDist(pos))
+					self.curPos = pos
 					if self.isLayerComplete(pos):
 						q.put(1)
 						return# True

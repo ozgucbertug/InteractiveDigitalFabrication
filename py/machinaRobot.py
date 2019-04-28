@@ -1,6 +1,6 @@
 """
 A convinient class of objects to communicate with Machina Bridge
-by Ardavan Bidgoli
+by Ardavan Bidgoli and Ozguc Bertug Capunaman
 Robotics Fellow at CMU
 WIP
 """
@@ -25,9 +25,7 @@ class MachinaRobot (object):
 
 
     async def sendToBridge(self,address= "", command=""):
-        # generic fucntion to communicate with web
-        # print (command)
-        # print (type(command))
+        # generic function to communicate with web
         if not isinstance(command, str) :
             raise ValueError("command must be an string object.")
             
@@ -37,33 +35,31 @@ class MachinaRobot (object):
         if address == "": 
             address = self.address
 
-        # print("sending to bridge...")
+        print("sending to bridge...")
 
         async with websockets.connect(address) as websocket:
             # it waits until the ws sends the message
             await websocket.send(command)
             # print("Message sent:{}".format(command))
             # then waits Bridge sends the feedback
-            # feedback = await websocket.recv()
+            feedback = await websocket.recv()
             # then it prints the feedback
             # print("Message Recieved:{}".format(feedback))
 
     async def sendQueueToBridge(self,address= "", commands= ""):
-        # generic fucntion to communicate with web
-        # print (command)
-        # print (type(command))
-        # if not isinstance(command, str) :
-        #     raise ValueError("command must be an string object.")
-            
-        # if not isinstance(address, str) :
-        #     raise ValueError("address must be an string object i.e.: \"ws://127.0.0.1:6999/Bridge\"")
-
+        # generic function to communicate with web
         if address == "": 
             address = self.address
         if commands == "":
             commands = self.commands
+            
+        if not isinstance(commands, list) :
+            raise ValueError("commands must be a list object.")
+            
+        if not isinstance(address, str) :
+            raise ValueError("address must be an string object i.e.: \"ws://127.0.0.1:6999/Bridge\"")
 
-        # print(commands)
+
         # print("sending to bridge...")
 
         async with websockets.connect(address) as websocket:
@@ -73,7 +69,7 @@ class MachinaRobot (object):
                 await websocket.send(command)
                 # print("Message sent:{}".format(command))
                 # then waits Bridge sends the feedback
-                # feedback = await websocket.recv()
+                feedback = await websocket.recv()
                 # then it prints the feedback
                 # print("Message Recieved:{}".format(feedback))
 
@@ -82,21 +78,17 @@ class MachinaRobot (object):
         if cmd == "":
             cmd = self.command
 
-        if not isinstance(cmd, list) : 
-            if isinstance(cmd, str) :
-                cmds = [cmds]
-            else:
-                raise ValueError("command {}".format(self.listError))
+        if cmd == "":
+            raise ValueError("command missing.")
 
-        for curCmd in cmds:
-             
-            if not isinstance(curCmd, str) :
-                raise ValueError("each command {}".format(self.stringError))
-            #asyncio.get_event_loop().run_until_complete(self.sendToBridge(self.address,curCmd))
-            try:
-                asyncio.get_event_loop().run_until_complete(self.sendToBridge(self.address,curCmd))
-            except:
-                print ("FAIL: {}".format(curCmd))
+        if not isinstance(cmd, str) :
+            raise ValueError("each command {}".format(self.stringError))
+
+        # try:
+        asyncio.get_event_loop().run_until_complete(self.sendToBridge(self.address,cmd))
+        # except:
+            # print ("FAIL: {}".format(cmd))
+        self.command = ""
         return 
 
     def runQueuedCommands(self,cmds = ""):
@@ -112,8 +104,8 @@ class MachinaRobot (object):
         # try:
         asyncio.new_event_loop().run_until_complete(self.sendQueueToBridge())
         # except:
-            # print ("FAILED TO RUN STACKED COMMANDS")
-        # return
+        #     print ("FAILED TO RUN STACKED COMMANDS")
+        return
 
     ##  ███████╗███████╗████████╗████████╗██╗███╗   ██╗ ██████╗ ███████╗
     ##  ██╔════╝██╔════╝╚══██╔══╝╚══██╔══╝██║████╗  ██║██╔════╝ ██╔════╝
@@ -125,6 +117,10 @@ class MachinaRobot (object):
     def speed(self,speedInc):
         self.command = "Speed({});".format(speedInc) 
         self.runCommand()
+        return
+
+    def queueSpeed(self,speedInc):
+        self.commands.append("Speed({});".format(speedInc))
         return  
 
     def speedTo(self,speedVal):
@@ -141,6 +137,10 @@ class MachinaRobot (object):
         self.runCommand()
         return  
 
+    def queueAcceleration(self,accelerationInc):
+        self.commands.append("Acceleration({});".format(accelerationInc))
+        return
+
     def accelerationTo(self,accelerationVal):
         self.command = "AccelerationTo({});".format(accelerationVal) 
         self.runCommand()
@@ -153,26 +153,46 @@ class MachinaRobot (object):
     def rotationSpeed(self,rotationSpeedInc):
         self.command = "RotationSpeed({});".format(rotationSpeedInc) 
         self.runCommand()
-        return  
+        return
+
+    def queueRotationSpeed(self,rotationSpeedInc):
+        self.commands.append("RotationSpeed({});".format(rotationSpeedInc))
+        return 
 
     def rotationSpeedTo(self,rotationSpeedVal):
         self.command = "RotationSpeedTo({});".format(rotationSpeedVal) 
         self.runCommand()
-        return  
+        return 
+
+    def queueRotationSpeedTo(self,rotationSpeedVal):
+        self.commands.append("RotationSpeedTo({});".format(rotationSpeedVal))
+        return 
 
     def jointSpeed(self,jointSpeedInc):
         self.command = "JointSpeed({});".format(jointSpeedInc) 
         self.runCommand()
         return  
 
+    def queueJointSpeed(self,jointSpeedInc):
+        self.commands.append("JointSpeed({});".format(jointSpeedInc))
+        return  
+
     def jointSpeedTo(self,jointSpeedVal):
         self.command = "JointSpeedTo({});".format(jointSpeedVal) 
         self.runCommand()
-        return  
+        return
+
+    def queueJointSpeedTo(self,jointSpeedVal):
+        self.commands.append("JointSpeedTo({});".format(jointSpeedVal))
+        return 
 
     def jointAcceleration(self,jointAccelerationInc):
         self.command = "JointAcceleration({});".format(jointAccelerationInc) 
         self.runCommand()
+        return  
+
+    def queueJointAcceleration(self,jointAccelerationInc):
+        self.commands.append("JointAcceleration({});".format(jointAccelerationInc))
         return  
 
     def jointAccelerationTo(self,jointAccelerationVal):
@@ -180,10 +200,18 @@ class MachinaRobot (object):
         self.runCommand()
         return  
 
+    def queueJointAccelerationTo(self,jointAccelerationVal):
+        self.commands.append("JointAccelerationTo({});".format(jointAccelerationVal))
+        return 
+
     def precision(self,precisionInc):
         self.command = "Precision({});".format(PrecisionInc) 
         self.runCommand()
-        return  
+        return
+
+    def queuePrecision(self,precisionInc):
+        self.commands.append("Precision({});".format(PrecisionInc))
+        return 
 
     def precisionTo(self,precisionVal):
         self.command = "PrecisionTo({});".format(precisionVal) 
@@ -285,6 +313,19 @@ class MachinaRobot (object):
         self.runCommand()
         return
 
+    def queueExternalAxis(self,axisNumber,increment):
+        if self.debug:
+            if not isinstance(axisNumber, int):
+                raise ValueError("axisNumber {}".format(intError))
+
+            if 1> axisNumber or axisNumber >6 :
+                raise ValueError("axisNumber {}".format(externalAxisError))
+
+            if not isinstance(increment, float):
+                raise ValueError("increment {}".format(floatError))
+
+        self.commands.append("ExternalAxis({},{});".format(axisNumber, increment))
+        return
 
     def externalAxisTo(self,axisNumber, val):
         if self.debug:
@@ -301,11 +342,27 @@ class MachinaRobot (object):
         self.runCommand()
         return
 
- 
+    def queueExternalAxisTo(self,axisNumber, val):
+        if self.debug:
+            if not isinstance(axisNumber, int):
+                raise ValueError("axisNumber {}".format(intError))
+
+            if 1> axisNumber or axisNumber >6 :
+                raise ValueError("axisNumber {}".format(externalAxisError))
+
+            if not isinstance(val, float):
+                raise ValueError("val {}".format(floatError))
+
+        self.commands.append("ExternalAxisTo({},{});".format(axisNumber, val))
+        return
 
     def transformTo(self,x,y,z,x0,x1,x2,y0,y1,y2):
         self.command = "TransformTo({},{},{},{},{},{},{},{},{});".format(x,y,z,x0,x1,x2,y0,y1,y2) 
         self.runCommand()
+        return
+
+    def queueTransformTo(self,x,y,z,x0,x1,x2,y0,y1,y2):
+        self.commands.append("TransformTo({},{},{},{},{},{},{},{},{});".format(x,y,z,x0,x1,x2,y0,y1,y2))
         return
 
     def rotate(self,x,y,z,angleInc):
@@ -313,9 +370,17 @@ class MachinaRobot (object):
         self.runCommand()
         return
 
+    def queueRotate(self,x,y,z,angleInc):
+        self.commands.append("Rotate({},{},{},{});".format(x,y,z,angleInc))
+        return
+
     def rotateTo(self,x0,x1,x2,y0,y1,y2):
         self.command = "RotateTo({},{},{},{},{},{});".format(x0,x1,x2,y0,y1,y2) 
         self.runCommand()
+        return
+
+    def queueRotateTo(self,x0,x1,x2,y0,y1,y2):
+        self.commands.append("RotateTo({},{},{},{},{},{});".format(x0,x1,x2,y0,y1,y2))
         return
 
     def axes (self,j1,j2,j3,j4,j5,j6):
@@ -323,9 +388,17 @@ class MachinaRobot (object):
         self.runCommand()
         return
 
+    def queueAxes (self,j1,j2,j3,j4,j5,j6):
+        self.commands.append("Axes({},{},{},{},{},{});".format(j1,j2,j3,j4,j5,j6))
+        return
+
     def axesTo (self,j1,j2,j3,j4,j5,j6):
         self.command = "AxesTo({},{},{},{},{},{});".format(j1,j2,j3,j4,j5,j6) 
         self.runCommand()
+        return
+
+    def queueAxesTo (self,j1,j2,j3,j4,j5,j6):
+        self.commands.append("AxesTo({},{},{},{},{},{});".format(j1,j2,j3,j4,j5,j6))
         return
 
     def queueAxesTo (self,j1,j2,j3,j4,j5,j6):
@@ -355,9 +428,17 @@ class MachinaRobot (object):
         self.runCommand()
         return  
 
+    def queuePushSettings(self):
+        self.commands.append("PushSettings();")
+        return 
+
     def popSettings(self):
         self.command = "PopSettings();" 
         self.runCommand()
+        return
+
+    def queuePopSettings(self):
+        self.commands.append("PopSettings();")
         return
 
 ###

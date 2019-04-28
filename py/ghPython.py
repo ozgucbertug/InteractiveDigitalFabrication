@@ -47,8 +47,8 @@ class ghApp():
 
 	def initSlice(self, init_geo):
 		result = []
-		plane = rs.PlaneFromPoints((-500,-500,0), (0,-500,0), (-500,0,0))
-		planeSrf = rs.AddPlaneSurface(plane, 1000, 1000)
+		plane = rs.PlaneFromPoints((-5000,-5000,0), (0,-5000,0), (-5000,0,0))
+		planeSrf = rs.AddPlaneSurface(plane, 10000, 10000)
 		crv = rs.IntersectBreps(init_geo, planeSrf)
 		result.append(crv)
 		while True:
@@ -59,6 +59,10 @@ class ghApp():
 				break
 			else:
 				result.append(crv)
+		result = rs.JoinCurves(result)
+		for i in range(1,len(result)):
+			if not rs.CurveDirectionsMatch(result[0], result[i]):
+				rs.ReverseCurve(result[i])
 		return result
 
 	def matchWObj(self, geoList):
@@ -67,11 +71,13 @@ class ghApp():
 		rot = rs.RotateObjects(geoList, rs.AddPoint(0,0,0), -90, copy=True)
 		return rs.CopyObjects(rot, vec)
 	
-	def crv2pts(self, crvList):
+	def crv2pts(self, crvList, startLayer = 1):
 		result = []
-		for i in range(len(crvList)):
+		print(self.resolution, len(crvList))
+		for i in range(startLayer,len(crvList)):
 			pts = rs.DivideCurve(crvList[i], self.resolution)
 			result.extend(pts)
+		print(len(result))
 		return result
 		
 	def pts2xyz(self, pts, FN):
@@ -107,7 +113,7 @@ class ghApp():
 	def divideLR(self, ptList):
 		Llist = rs.CopyObjects(ptList[0:][::2])
 		Rlist = rs.CopyObjects(ptList[1:][::2])
-		self.shift(Rlist, 2)
+		self.shift(Rlist, 4)
 		return Llist, Rlist
 
 	def mergeLR(self, Llist, Rlist):
@@ -210,16 +216,15 @@ class ghApp():
 		result.reverse()
 		return result
 
-
 	def extrapolateTP(self, ptCloud):
 		ptList = self.dividePtCloud(ptCloud)
 		crvL, crvR = self.divideLR(self.createLines(ptList, 5))
-		crvMerged = self.mergeLR(crvL, crvR)
+		crvMerged = self.mergeLR(crvL, crvR)#[0:][::2]
 		offCrv = self.offsetCurves(crvMerged)
 		WObjCrv = self.matchWObj(offCrv)
 		extCrv = self.getExtendedCrv(WObjCrv, vecMul = self.userParam)
 		extLayer = self.getExtendedTP(extCrv)
-		extTP = self.crv2pts(extLayer)
+		extTP = self.crv2pts(extLayer, 1)
 		return extTP
 
 	def extrapolateGeo(self, ptCloud):
@@ -252,6 +257,7 @@ class ghApp():
 						self.layer_height = float(argsList[4])
 						time.sleep(.1)
 						print("Handshaking Done!")
+						print("Session: ", self._session, "Layer Subdivision: ", self.resolution, "Layer Height: ", self.layer_height)
 						return "-gh_success"
 						
 					### INIT GEO ###
@@ -263,7 +269,7 @@ class ghApp():
 						else:
 							crvList = self.initSlice(init_geo)
 							WObjCrv = self.matchWObj(crvList)
-							pts = self.crv2pts(WObjCrv)
+							pts = self.crv2pts(WObjCrv, 1)
 							self.pts2xyz(pts, argsList[2])
 						time.sleep(.1)
 						print("Returning Initial Toolpath Done!")
@@ -289,6 +295,8 @@ class ghApp():
 						return "-gh_success"
 					elif argsList[1] == "dec" or argsList[1] == "inc":
 						self.changeUserParam(argsList[1])
+					elif argsList[1] == "WObj":
+						self.WObj = [float(argsList[2]), float(argsList[3]), float(argsList[4])]
 
 		return ""     
 
