@@ -22,7 +22,7 @@ class IDF(object):
 		self.nozzle_width = 10
 		self.layer_height = self.nozzle_width/4
 		self.resolution = 100
-		self.minLayer = 30
+		self.minLayer = 0
 
 		self.listener = None
 
@@ -153,8 +153,8 @@ class IDF(object):
 		ret = self.UDP_receive(20)
 		if ret == '-gh_success':
 			print("Successful!")
-		else:
-			print(" Failed!")
+		# else:
+			# print("Failed!")
 			# self._done = True
 
 	def request_ext_toolpath(self):
@@ -169,8 +169,8 @@ class IDF(object):
 			self.import_TP(filename2)
 			if self.TP != None:
 				self._state = 'ready'
-		else:
-			print(" Failed!")
+		# else:
+			# print("Failed!")
 			# self._done = True
 
 	def import_TP(self, FN):

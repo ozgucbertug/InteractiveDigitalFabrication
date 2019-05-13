@@ -30,8 +30,8 @@ class ghApp():
 
 	def changeUserParam(self,msg,deltaVal =.05):
 		if msg == "inc":
-			if self.userParam + deltaVal >= 1.:
-				self.userParam = 1.
+			if self.userParam + deltaVal >= 1.5:
+				self.userParam = 1.5
 				sc.sticky["param"] = self.userParam
 
 			else:
@@ -110,6 +110,9 @@ class ghApp():
 			seq.append(seq.pop(0))
 		return seq
 
+	def dist(self, pt0, pt1):
+		return rs.Distance(pt0, pt1)
+
 	def divideLR(self, ptList):
 		Llist = rs.CopyObjects(ptList[0:][::2])
 		Rlist = rs.CopyObjects(ptList[1:][::2])
@@ -139,10 +142,35 @@ class ghApp():
 				_,_,curZ = rs.PointCoordinates(points[i])
 				_,_,nextZ = rs.PointCoordinates(points[i+1])
 				distZ = curZ - nextZ
-				if distZ < -50:
+				if distZ < -10:
 					ptList.append(tmp)
 					tmp = []
 		return ptList
+
+	def clean(self, ptList):
+		result = []
+		for list in ptList:
+			bin = []
+			tmp = []
+			tmplen = len(list)
+	#        print(tmplen)
+			for i in range(len(list)):
+				if i ==0:
+					tmp.append(list[i])
+				else:
+					if self.dist(list[i-1], list[i]) > 5:
+						bin.append(tmp)
+						tmp = []
+					tmp.append(list[i])
+			bin.append(tmp)
+			tmpResult = []
+			for b in bin:
+				if len(b) > len(tmpResult):
+					tmpResult = b
+			result.append(tmpResult)
+	#        print len(tmpResult)
+	#        print "-------"
+		return result
 
 	def createLines(self, ptList, rebuildCount = 10, degree = 3 ):
 		crvList = []
@@ -218,6 +246,7 @@ class ghApp():
 
 	def extrapolateTP(self, ptCloud):
 		ptList = self.dividePtCloud(ptCloud)
+		ptList = self.clean(ptList)
 		crvL, crvR = self.divideLR(self.createLines(ptList, 5))
 		crvMerged = self.mergeLR(crvL, crvR)#[0:][::2]
 		offCrv = self.offsetCurves(crvMerged)
@@ -229,6 +258,7 @@ class ghApp():
 
 	def extrapolateGeo(self, ptCloud):
 		ptList = self.dividePtCloud(ptCloud)
+		ptList = self.clean(ptList)
 		crvL, crvR = self.divideLR(self.createLines(ptList, 5))
 		crvMerged = self.mergeLR(crvL, crvR)
 		offCrv = self.offsetCurves(crvMerged)
